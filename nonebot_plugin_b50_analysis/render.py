@@ -67,6 +67,10 @@ def _ra_pic(rating: int) -> str:
 
 
 def _parse_analysis_result(analysis: Any) -> dict:
+    print("=== render.py 接收到的 analysis 内容 ===")
+    print(analysis)
+    print("======================================")
+    
     if isinstance(analysis, dict):
         raw = dict(analysis)
     else:
@@ -85,7 +89,21 @@ def _parse_analysis_result(analysis: Any) -> dict:
             else:
                 raw = {}
         if not raw:
-            raw = {"title": "B50锐评", "overall_roast": text, "impression_roast": ""}
+            # 尝试从非 JSON 格式的文本中提取三个字段
+            title = "B50锐评"
+            overall = text
+            impression = ""
+            # 尝试查找 title、overall_roast、impression_roast 等关键词
+            lines = text.split("\n")
+            for line in lines:
+                line = line.strip()
+                if line.startswith(("title", "标题")):
+                    title = re.sub(r"^(title|标题)[：:]\s*", "", line, flags=re.I).strip()
+                elif line.startswith(("overall_roast", "正文")):
+                    overall = re.sub(r"^(overall_roast|正文)[：:]\s*", "", line, flags=re.I).strip()
+                elif line.startswith(("impression_roast", "总结")):
+                    impression = re.sub(r"^(impression_roast|总结)[：:]\s*", "", line, flags=re.I).strip()
+            raw = {"title": title, "overall_roast": overall, "impression_roast": impression}
 
     title = _strip(str(raw.get("title") or "")).replace("\r", " ").replace("\n", " ").strip()
     overall = _strip(str(raw.get("overall_roast") or "")).replace("\r", " ").strip()
@@ -94,7 +112,12 @@ def _parse_analysis_result(analysis: Any) -> dict:
     impression = re.sub(r"\s*\n\s*", " ", impression)
     if not title:
         title = "B50锐评"
-    return {"title": title, "overall_roast": overall, "impression_roast": impression}
+    
+    result = {"title": title, "overall_roast": overall, "impression_roast": impression}
+    print("=== 解析后的结果 ===")
+    print(result)
+    print("====================")
+    return result
 
 
 class _Draw:

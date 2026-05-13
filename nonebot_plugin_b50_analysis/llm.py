@@ -60,26 +60,53 @@ def _sanitize_rating_terms(text: str) -> str:
 
 
 def _cleanup_response(raw_text: str) -> str:
+    print("=== _cleanup_response 接收到的原始内容 ===")
+    print(raw_text)
+    print("========================================")
+    
     text = str(raw_text or "").strip()
     text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
     text = re.sub(r"\s*```$", "", text, flags=re.I)
+    
+    # 初始化默认值
+    title = "B50锐评"
+    overall_roast = ""
+    impression_roast = ""
+    
     try:
         data = json.loads(text)
+        title = str(data.get("title") or title)
+        overall_roast = str(data.get("overall_roast") or "")
+        impression_roast = str(data.get("impression_roast") or "")
     except Exception:
         m = re.search(r"\{[\s\S]*\}", text)
-        if not m:
-            return _sanitize_rating_terms(text)
-        try:
-            data = json.loads(m.group(0))
-        except Exception:
-            return _sanitize_rating_terms(text)
-
+        if m:
+            try:
+                data = json.loads(m.group(0))
+                title = str(data.get("title") or title)
+                overall_roast = str(data.get("overall_roast") or "")
+                impression_roast = str(data.get("impression_roast") or "")
+            except Exception:
+                # 如果 JSON 解析失败，尝试从文本中提取
+                overall_roast = text
+        else:
+            overall_roast = text
+    
+    # 确保至少有 overall_roast
+    if not overall_roast:
+        overall_roast = text
+    
     cleaned = {
-        "title": _sanitize_rating_terms(str(data.get("title") or "")).replace("\r", " ").replace("\n", " ").strip(),
-        "overall_roast": _sanitize_rating_terms(str(data.get("overall_roast") or "")).replace("\r", " ").replace("\n", " ").strip(),
-        "impression_roast": _sanitize_rating_terms(str(data.get("impression_roast") or "")).replace("\r", " ").replace("\n", " ").strip(),
+        "title": _sanitize_rating_terms(title).replace("\r", " ").replace("\n", " ").strip(),
+        "overall_roast": _sanitize_rating_terms(overall_roast).replace("\r", " ").replace("\n", " ").strip(),
+        "impression_roast": _sanitize_rating_terms(impression_roast).replace("\r", " ").replace("\n", " ").strip(),
     }
-    return json.dumps(cleaned, ensure_ascii=False)
+    
+    result = json.dumps(cleaned, ensure_ascii=False)
+    print("=== _cleanup_response 返回的结果 ===")
+    print(result)
+    print("==================================")
+    return result
 
 
 def _fmt(context: dict) -> str:
@@ -269,4 +296,8 @@ async def generate_analysis(context: dict, config: Config, style: str = "") -> s
         max_tokens=1600,
     )
     content = (resp.choices[0].message.content or "").strip()
+    # 打印 LLM 原始返回内容用于调试
+    print("=== LLM 原始返回内容 ===")
+    print(content)
+    print("=========================")
     return _cleanup_response(content)
